@@ -1,8 +1,13 @@
 #!/usr/bin/env bash
+DSTDIR="$2"
 
-if [[ $# -ne 1 ]]; then
-    echo "Needs exactly one argument which must be an initramfs. Exiting..."
+if [[ $# -gt 2 || $# -lt 1 ]]; then
+    echo "Needs exactly one (initrd) or two (initrd and destination) arguments. Exiting..."
     exit 1
+fi
+
+if [[ $# -eq 2 ]]; then
+    cd $DSTDIR
 fi
 
 GREP=$(which rg)
@@ -55,5 +60,32 @@ function decompress() {
     }
 }
 
-decompress
+function process_blocks() {
+    blk=0
+    while [[ $blk =~ ^[0-9]+$ ]]; do
+        file_type=$(dd if=$INITRD skip=$blk | file -b -)
+        if [[ $file_type =~ "cpio archive" ]]; then
+            next_blk=$(dd if=$INITRD skip=$blk | cpio -idm 2>&1 | cut -d' ' -f1)
+        elif [[ $file_type =~ "Zstandard" ]]; then
+            next_blk=$(dd if=$INITRD skip=$blk | unzstd > myfile)
+            if [[ $(file -b myfile) =~ "cpio archive" ]]; then
+                cpio -idm < myfile
+                sleep 0.5; rm myfile
+            else
+                echo "Unknown file"
+            fi
+        else
+            echo "Unknown"
+        fi
+
+        if [[ "$next_blk" =~ ^[0-9]+$ ]]; then
+            blk=$(( next_blk + blk ))
+        else
+            break
+        fi
+    done
+}
+
+#decompress
+process_blocks
 unset i
