@@ -1,66 +1,24 @@
 #!/usr/bin/env bash
-DSTDIR="$2"
 
 if [[ $# -gt 2 || $# -lt 1 ]]; then
-    echo "Needs exactly one (initrd) or two (initrd and destination) arguments. Exiting..."
+    echo "Needs exactly one (initrd) or two (initrd and destination dir) arguments. Exiting..."
     exit 1
 fi
 
-if [[ $# -eq 2 ]]; then
-    cd $DSTDIR
-fi
-
 GREP=$(which rg)
-INITRD=$1
+INITRD=$(readlink -qe $1)
+DSTDIR="$2"
 BLOCKS=()
 
-function get_starting_block() {
-    local start=$1
-    $GREP -q cpio <(dd if=$INITRD skip=$start | file -b -)
-    status=$?
+if [[ $# -eq 2 && -d "$DSTDIR" ]]; then
+    echo "Changing directory to $DSTDIR"
+    cd $DSTDIR
+else
+    echo "Directory $DSTDIR does not exist. Exiting..."
+    exit 1
+fi
 
-    if (exit $status); then
-        start=$(dd if=$INITRD skip=$start | cpio -idm --only-verify-crc 2>&1 | cut -d' '  -f1)
-        echo $start
-    fi
-}
-
-function while_blocks() {
-    if [[ $1 =~ ^[0-9]+$ ]]; then
-        BLOCKS+=( $1 )
-    fi
-
-    curr=$(get_starting_block $1)
-
-    while [[ $curr =~ ^[0-9]+$ ]]; do
-        curr=$(( ${BLOCKS[@]: -1} + $curr ))
-        BLOCKS+=( $curr )
-        curr=$(get_starting_block $curr)
-    done
-}
-
-function decompress() {
-    while_blocks 0
-
-    for ((i=0; i<${#BLOCKS[@]};i++)) {
-        start="${BLOCKS[i]}"
-        blk=$(dd if=$INITRD skip=$start | file -b -)
-
-        if [[ $blk =~ "cpio" ]]; then
-            dd if=$INITRD skip=$start | cpio -idm
-        elif [[ $blk =~ "Zstandard" ]]; then
-            dd if=$INITRD skip=$start | unzstd > myfile
-            if [[ $(file -b myfile) =~ "cpio" ]]; then
-                cpio -idm < myfile
-                sleep 0.5; rm myfile
-            fi
-        else
-            echo "Unknown"
-        fi
-    }
-}
-
-function process_blocks() {
+function decompress_archive() {
     blk=0
     while [[ $blk =~ ^[0-9]+$ ]]; do
         file_type=$(dd if=$INITRD skip=$blk | file -b -)
@@ -86,6 +44,5 @@ function process_blocks() {
     done
 }
 
-#decompress
-process_blocks
+decompress_archive
 unset i
