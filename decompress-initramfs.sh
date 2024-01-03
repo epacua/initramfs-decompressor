@@ -1,5 +1,8 @@
 #!/usr/bin/env bash
 
+# Author: Erwin Pacua <erwin.pacua@gmail.com
+# Date:   Wed Jan 03 14:21:16 2024 +1300
+
 function prerun_checks() {
     if [[ $# -gt 2 || $# -lt 1 ]]; then
         echo "This script accepts one (initrd) or two arguments (if destdir is supplied) only."
