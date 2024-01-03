@@ -1,0 +1,1 @@
+With the challenge of finding a reliable way on how to decompress an initramfs, I came up with this script that decompresses an initramfs (cpio archive) which might contains sub-archives and with different compression types.
